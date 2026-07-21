@@ -148,6 +148,4 @@ STORAGES = {
     "staticfiles": {
         "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
     },
-}git add .
-git commit -m "use Django 6 STORAGES dict instead of deprecated DEFAULT_FILE_STORAGE"
-git push
+}
