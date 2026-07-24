@@ -11,6 +11,10 @@ table. This keeps things simple now and scales fine to hundreds of pieces.
 from django.db import models
 from django.conf import settings
 from django.utils.text import slugify
+from cloudinary_storage.storage import (
+    MediaCloudinaryStorage,
+    VideoMediaCloudinaryStorage,
+)
 
 
 # ---------------------------------------------------------------------
@@ -148,9 +152,17 @@ class MediaFile(models.Model):
     class Meta:
         ordering = ["order", "id"]
 
+    def save(self, *args, **kwargs):
+        if self.file:
+            if self.kind in ("video", "audio"):
+                self.file.storage = VideoMediaCloudinaryStorage()
+            else:
+                self.file.storage = MediaCloudinaryStorage()
+
+        super().save(*args, **kwargs)
+
     def __str__(self):
         return f"{self.kind} for {self.content_piece.title}"
-
 
 # ---------------------------------------------------------------------
 # 6. COMMENT — reader engagement
