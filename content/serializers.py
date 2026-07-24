@@ -29,13 +29,23 @@ class ContentPieceListSerializer(serializers.ModelSerializer):
     """Lighter version for the homepage/listing — no full body text."""
     author = AuthorSerializer(read_only=True)
     genre = GenreSerializer(read_only=True)
+    excerpt = serializers.SerializerMethodField()
 
     class Meta:
         model = ContentPiece
         fields = [
             "id", "title", "slug", "subtitle", "content_type",
             "author", "genre", "cover_image", "is_featured", "published_at",
+            "excerpt",
         ]
+
+    def get_excerpt(self, obj):
+        body = getattr(obj, "body", "") or ""
+        clean = body.strip()
+        max_len = 160
+        if len(clean) <= max_len:
+            return clean
+        return clean[:max_len].rstrip() + "…"
 
 
 class ContentPieceDetailSerializer(serializers.ModelSerializer):
