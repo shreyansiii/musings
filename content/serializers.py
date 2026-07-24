@@ -15,9 +15,14 @@ class AuthorSerializer(serializers.ModelSerializer):
 
 
 class MediaFileSerializer(serializers.ModelSerializer):
+    file = serializers.SerializerMethodField()
+
     class Meta:
         model = MediaFile
         fields = ["id", "kind", "file", "caption", "order"]
+
+    def get_file(self, obj):
+        return obj.file.url if obj.file else None
 
 
 class ContentPieceListSerializer(serializers.ModelSerializer):
