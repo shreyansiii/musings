@@ -15,6 +15,7 @@ from cloudinary_storage.storage import (
     MediaCloudinaryStorage,
     VideoMediaCloudinaryStorage,
 )
+from cloudinary.models import CloudinaryField
 
 
 # ---------------------------------------------------------------------
@@ -145,7 +146,10 @@ class MediaFile(models.Model):
         ContentPiece, on_delete=models.CASCADE, related_name="media_files"
     )
     kind = models.CharField(max_length=10, choices=MEDIA_KINDS)
-    file = models.FileField(upload_to="media/%Y/%m/")
+    file = CloudinaryField(
+    resource_type="auto",
+    folder="media",
+)
     caption = models.CharField(max_length=200, blank=True)
     order = models.PositiveIntegerField(default=0, help_text="Display order in gallery")
 
