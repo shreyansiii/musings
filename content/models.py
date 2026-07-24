@@ -11,10 +11,7 @@ table. This keeps things simple now and scales fine to hundreds of pieces.
 from django.db import models
 from django.conf import settings
 from django.utils.text import slugify
-from cloudinary_storage.storage import (
-    MediaCloudinaryStorage,
-    VideoMediaCloudinaryStorage,
-)
+
 from cloudinary.models import CloudinaryField
 
 
@@ -143,27 +140,27 @@ class MediaFile(models.Model):
     ]
 
     content_piece = models.ForeignKey(
-        ContentPiece, on_delete=models.CASCADE, related_name="media_files"
+        ContentPiece,
+        on_delete=models.CASCADE,
+        related_name="media_files",
     )
+
     kind = models.CharField(max_length=10, choices=MEDIA_KINDS)
+
     file = CloudinaryField(
-    resource_type="auto",
-    folder="media",
-)
+        resource_type="auto",
+        folder="media",
+    )
+
     caption = models.CharField(max_length=200, blank=True)
-    order = models.PositiveIntegerField(default=0, help_text="Display order in gallery")
+
+    order = models.PositiveIntegerField(
+        default=0,
+        help_text="Display order in gallery",
+    )
 
     class Meta:
         ordering = ["order", "id"]
-
-    def save(self, *args, **kwargs):
-        if self.file:
-            if self.kind in ("video", "audio"):
-                self.file.storage = VideoMediaCloudinaryStorage()
-            else:
-                self.file.storage = MediaCloudinaryStorage()
-
-        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.kind} for {self.content_piece.title}"
