@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Genre, Author, Issue, ContentPiece, MediaFile, Comment
+from .models import Genre, Author, Issue, ContentPiece, MediaFile, Comment, NewsletterSubscriber
 
 
 class MediaFileInline(admin.TabularInline):
@@ -12,6 +12,14 @@ class ContentPieceAdmin(admin.ModelAdmin):
     inlines = [MediaFileInline]
     list_display = ["title", "content_type", "genre", "status", "published_at"]
     list_filter = ["content_type", "status", "genre"]
+
+
+@admin.register(NewsletterSubscriber)
+class NewsletterSubscriberAdmin(admin.ModelAdmin):
+    list_display = ['email', 'subscribed_at', 'is_active']
+    list_filter = ['is_active', 'subscribed_at']
+    search_fields = ['email']
+    readonly_fields = ['subscribed_at']
 
 
 admin.site.register(Genre)

@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Genre, Author, Issue, ContentPiece, MediaFile
+from .models import Genre, Author, Issue, ContentPiece, MediaFile, NewsletterSubscriber
 
 
 class GenreSerializer(serializers.ModelSerializer):
@@ -61,3 +61,18 @@ class ContentPieceDetailSerializer(serializers.ModelSerializer):
             "author", "genre", "cover_image", "media_files",
             "is_featured", "published_at",
         ]
+
+
+class NewsletterSubscriberSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+
+    def create(self, validated_data):
+        email = validated_data['email']
+        subscriber, created = NewsletterSubscriber.objects.get_or_create(
+            email=email,
+            defaults={'is_active': True}
+        )
+        if not created and not subscriber.is_active:
+            subscriber.is_active = True
+            subscriber.save()
+        return subscriber
