@@ -228,10 +228,13 @@ class Comment(models.Model):
 def _do_send_newsletter(content_piece_id, title, subtitle, slug):
     from django.core.mail import send_mass_mail as _send_mass_mail
 
+    print(f"[NEWSLETTER] Background thread started for piece {content_piece_id}")
     try:
         subscribers = NewsletterSubscriber.objects.filter(is_active=True)
         emails = list(subscribers.values_list("email", flat=True))
+        print(f"[NEWSLETTER] Found {len(emails)} active subscriber(s): {emails}")
         if not emails:
+            print("[NEWSLETTER] No active subscribers, aborting send.")
             return
 
         subject = f"New: {title} — MUSINGS by Shreyansi"
@@ -252,25 +255,34 @@ An Independent Magazine
 """
 
         from_email = getattr(settings, "DEFAULT_FROM_EMAIL", "noreply@musingsby.shreyansi.com")
+        print(f"[NEWSLETTER] Sending from {from_email} to {emails} via {settings.EMAIL_HOST}")
 
-        _send_mass_mail(
+        result = _send_mass_mail(
             [(subject, message, from_email, [email]) for email in emails],
-            fail_silently=True,
+            fail_silently=False,
         )
+        print(f"[NEWSLETTER] send_mass_mail returned: {result}")
 
-        # Mark as sent so we never fire again for this piece.
         ContentPiece.objects.filter(pk=content_piece_id).update(newsletter_sent=True)
+        print(f"[NEWSLETTER] Marked piece {content_piece_id} as newsletter_sent=True")
     except Exception as e:
-        print(f"Newsletter send error: {e}")
+        print(f"[NEWSLETTER] SEND ERROR: {type(e).__name__}: {e}")
 
 
 @receiver(post_save, sender=ContentPiece)
 def send_newsletter_on_publish(sender, instance, created, **kwargs):
-    """Schedule a newsletter send the first time a piece becomes published."""
+    print(
+        f"[NEWSLETTER] Signal fired for '{instance.title}' — "
+        f"status={instance.status}, published_at={instance.published_at}, "
+        f"newsletter_sent={instance.newsletter_sent}"
+    )
     if (
         instance.status == "published"
         and instance.published_at
         and not instance.newsletter_sent
     ):
+        print(f"[NEWSLETTER] Conditions met, scheduling send for piece {instance.pk}")
         args = (instance.pk, instance.title, instance.subtitle, instance.slug)
         transaction.on_commit(lambda: threading.Thread(target=_do_send_newsletter, args=args, daemon=True).start())
+    else:
+        print(f"[NEWSLETTER] Conditions NOT met, skipping send for piece {instance.pk}")
