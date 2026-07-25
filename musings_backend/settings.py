@@ -156,5 +156,5 @@ EMAIL_PORT = 587
 EMAIL_USE_TLS = True
 EMAIL_HOST_USER = os.getenv('EMAIL_USER', '')
 EMAIL_HOST_PASSWORD = os.getenv('EMAIL_PASSWORD', '')
-DEFAULT_FROM_EMAIL = 'noreply@musingsby.shreyansi.com'
+DEFAULT_FROM_EMAIL = os.getenv('EMAIL_USER', '')
 FRONTEND_URL = os.getenv('FRONTEND_URL', 'https://musingsby.shreyansi.com')
