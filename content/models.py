@@ -8,7 +8,9 @@ piece it is. Media (audio/video/images) attach via a separate MediaFile
 table. This keeps things simple now and scales fine to hundreds of pieces.
 """
 
-from django.db import models
+import threading
+
+from django.db import models, transaction
 from django.conf import settings
 from django.utils.text import slugify
 from django.core.mail import send_mass_mail
@@ -114,6 +116,11 @@ class ContentPiece(models.Model):
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="draft")
     is_featured = models.BooleanField(default=False)
 
+    # Tracks whether the publish-newsletter has already gone out for this
+    # piece, so re-saving/editing an already-published piece never
+    # re-triggers a full subscriber blast.
+    newsletter_sent = models.BooleanField(default=False)
+
     published_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -204,44 +211,60 @@ class Comment(models.Model):
 
 # ---------------------------------------------------------------------
 # 8. SIGNAL — Send newsletter email when new content is published
+#
+# IMPORTANT: this handler only *schedules* the send after the DB
+# transaction commits, and does the actual sending on a background
+# thread. This keeps the admin's save/response fast regardless of how
+# slow the SMTP backend is. It also only fires ONCE per piece, tracked
+# via the newsletter_sent flag, so editing a published piece later
+# never re-blasts subscribers.
 # ---------------------------------------------------------------------
-@receiver(post_save, sender=ContentPiece)
-def send_newsletter_on_publish(sender, instance, created, **kwargs):
-    """Send newsletter email to all subscribers when new content is published."""
-    # Only send if status is published and published_at is set
-    if instance.status == "published" and instance.published_at:
+def _do_send_newsletter(content_piece_id, title, subtitle, slug):
+    from django.core.mail import send_mass_mail as _send_mass_mail
+
+    try:
         subscribers = NewsletterSubscriber.objects.filter(is_active=True)
-        if not subscribers.exists():
+        emails = list(subscribers.values_list("email", flat=True))
+        if not emails:
             return
 
-        emails = [sub.email for sub in subscribers]
-        subject = f"New: {instance.title} — MUSINGS by Shreyansi"
-        
-        frontend_url = getattr(settings, 'FRONTEND_URL', 'https://musingsby.shreyansi.com')
-        
+        subject = f"New: {title} — MUSINGS by Shreyansi"
+        frontend_url = getattr(settings, "FRONTEND_URL", "https://musingsby.shreyansi.com")
+
         message = f"""Hi there,
 
 New content from MUSINGS by Shreyansi:
 
-{instance.title}
-{instance.subtitle or ''}
+{title}
+{subtitle or ''}
 
-Read more: {frontend_url}/piece/{instance.slug}
+Read more: {frontend_url}/piece/{slug}
 
 ---
 MUSINGS by Shreyansi
 An Independent Magazine
-        """
+"""
 
-        from_email = getattr(settings, 'DEFAULT_FROM_EMAIL', 'noreply@musingsby.shreyansi.com')
-        
-        try:
-            send_mass_mail(
-                [(subject, message, from_email, [email]) for email in emails],
-                fail_silently=False,
-            )
-        except Exception as e:
-            print(f"Newsletter send error: {e}")
+        from_email = getattr(settings, "DEFAULT_FROM_EMAIL", "noreply@musingsby.shreyansi.com")
 
-# Register the signal
-post_save.connect(send_newsletter_on_publish, sender=ContentPiece)
+        _send_mass_mail(
+            [(subject, message, from_email, [email]) for email in emails],
+            fail_silently=True,
+        )
+
+        # Mark as sent so we never fire again for this piece.
+        ContentPiece.objects.filter(pk=content_piece_id).update(newsletter_sent=True)
+    except Exception as e:
+        print(f"Newsletter send error: {e}")
+
+
+@receiver(post_save, sender=ContentPiece)
+def send_newsletter_on_publish(sender, instance, created, **kwargs):
+    """Schedule a newsletter send the first time a piece becomes published."""
+    if (
+        instance.status == "published"
+        and instance.published_at
+        and not instance.newsletter_sent
+    ):
+        args = (instance.pk, instance.title, instance.subtitle, instance.slug)
+        transaction.on_commit(lambda: threading.Thread(target=_do_send_newsletter, args=args, daemon=True).start())
