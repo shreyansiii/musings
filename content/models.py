@@ -11,6 +11,9 @@ table. This keeps things simple now and scales fine to hundreds of pieces.
 from django.db import models
 from django.conf import settings
 from django.utils.text import slugify
+from django.core.mail import send_mass_mail
+from django.db.models.signals import post_save
+from django.dispatch import receiver
 
 from cloudinary.models import CloudinaryField
 
@@ -165,8 +168,24 @@ class MediaFile(models.Model):
     def __str__(self):
         return f"{self.kind} for {self.content_piece.title}"
 
+
 # ---------------------------------------------------------------------
-# 6. COMMENT — reader engagement
+# 6. NEWSLETTER SUBSCRIBER — email list for newsletter
+# ---------------------------------------------------------------------
+class NewsletterSubscriber(models.Model):
+    email = models.EmailField(unique=True)
+    subscribed_at = models.DateTimeField(auto_now_add=True)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["-subscribed_at"]
+
+    def __str__(self):
+        return self.email
+
+
+# ---------------------------------------------------------------------
+# 7. COMMENT — reader engagement
 # ---------------------------------------------------------------------
 class Comment(models.Model):
     content_piece = models.ForeignKey(
@@ -183,14 +202,46 @@ class Comment(models.Model):
         return f"Comment by {self.user} on {self.content_piece.title}"
 
 
+# ---------------------------------------------------------------------
+# 8. SIGNAL — Send newsletter email when new content is published
+# ---------------------------------------------------------------------
+@receiver(post_save, sender=ContentPiece)
+def send_newsletter_on_publish(sender, instance, created, **kwargs):
+    """Send newsletter email to all subscribers when new content is published."""
+    # Only send if status is published and published_at is set
+    if instance.status == "published" and instance.published_at:
+        subscribers = NewsletterSubscriber.objects.filter(is_active=True)
+        if not subscribers.exists():
+            return
 
-class NewsletterSubscriber(models.Model):
-    email = models.EmailField(unique=True)
-    subscribed_at = models.DateTimeField(auto_now_add=True)
-    is_active = models.BooleanField(default=True)
+        emails = [sub.email for sub in subscribers]
+        subject = f"New: {instance.title} — MUSINGS by Shreyansi"
+        
+        frontend_url = getattr(settings, 'FRONTEND_URL', 'https://musingsby.shreyansi.com')
+        
+        message = f"""Hi there,
 
-    class Meta:
-        ordering = ["-subscribed_at"]
+New content from MUSINGS by Shreyansi:
 
-    def __str__(self):
-        return self.email
+{instance.title}
+{instance.subtitle or ''}
+
+Read more: {frontend_url}/piece/{instance.slug}
+
+---
+MUSINGS by Shreyansi
+An Independent Magazine
+        """
+
+        from_email = getattr(settings, 'DEFAULT_FROM_EMAIL', 'noreply@musingsby.shreyansi.com')
+        
+        try:
+            send_mass_mail(
+                [(subject, message, from_email, [email]) for email in emails],
+                fail_silently=False,
+            )
+        except Exception as e:
+            print(f"Newsletter send error: {e}")
+
+# Register the signal
+post_save.connect(send_newsletter_on_publish, sender=ContentPiece)
