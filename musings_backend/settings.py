@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'cloudinary_storage',
     'cloudinary',
+     "anymail",
     'rest_framework',
     'corsheaders',
     'content',
@@ -150,11 +151,12 @@ STORAGES = {
     },
 }
 # Email configuration
-EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = 'smtp.gmail.com'
-EMAIL_PORT = 587
-EMAIL_USE_TLS = True
-EMAIL_HOST_USER = os.getenv('EMAIL_USER', '')
-EMAIL_HOST_PASSWORD = os.getenv('EMAIL_PASSWORD', '')
-DEFAULT_FROM_EMAIL = os.getenv('EMAIL_USER', '')
+
+EMAIL_BACKEND = "anymail.backends.resend.EmailBackend"
+
+ANYMAIL = {
+    "RESEND_API_KEY": os.getenv("RESEND_API_KEY", ""),
+}
+
+DEFAULT_FROM_EMAIL = "onboarding@resend.dev"
 FRONTEND_URL = os.getenv('FRONTEND_URL', 'https://musingsby.shreyansi.com')
