@@ -91,7 +91,7 @@ class ContactMessageView(APIView):
                 subject=f"New contact form message from {name}",
                 body=f"From: {name} <{email}>\n\n{message}",
                 from_email=from_email,
-                to=["musingsbyshreyansi@gmail.com"],
+                to=["shreyansishrestha@gmail.com"],
                 reply_to=[email],
             )
             notification.send(fail_silently=False)
