@@ -45,6 +45,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'corsheaders',
     'content',
+    "tinymce",
 ]
 
 MIDDLEWARE = [
@@ -160,3 +161,24 @@ ANYMAIL = {
 
 DEFAULT_FROM_EMAIL = "onboarding@resend.dev"
 FRONTEND_URL = os.getenv('FRONTEND_URL', 'https://musingsby.shreyansi.com')
+
+
+
+TINYMCE_DEFAULT_CONFIG = {
+    "height": 700,
+    "width": "100%",
+    "menubar": True,
+    "plugins": (
+        "advlist autolink lists link image charmap preview anchor "
+        "searchreplace visualblocks code fullscreen "
+        "insertdatetime media table help wordcount"
+    ),
+    "toolbar": (
+        "undo redo | styles | "
+        "bold italic underline | "
+        "alignleft aligncenter alignright alignjustify | "
+        "bullist numlist outdent indent | "
+        "link image table | "
+        "removeformat | code fullscreen"
+    ),
+}
