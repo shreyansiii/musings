@@ -290,7 +290,7 @@ def _do_send_newsletter(content_piece_id, title, subtitle, slug, content_type_la
 
         frontend_url = getattr(settings, "FRONTEND_URL", "https://musingsby.shreyansi.com")
         read_url = f"{frontend_url}/piece/{slug}"
-        from_email = getattr(settings, "DEFAULT_FROM_EMAIL", "noreply@musingsby.shreyansi.com")
+        from_email = getattr(settings, "DEFAULT_FROM_EMAIL", None) or settings.EMAIL_HOST_USER
 
         excerpt = (body or "").strip()
         if len(excerpt) > 280:
@@ -376,8 +376,6 @@ def send_newsletter_on_publish(sender, instance, created, **kwargs):
 
 
 
-
-
 # """
 # MUSINGS by Shreyansi — core content models
 # App: content/models.py
@@ -393,7 +391,7 @@ def send_newsletter_on_publish(sender, instance, created, **kwargs):
 # from django.db import models, transaction
 # from django.conf import settings
 # from django.utils.text import slugify
-# from django.core.mail import send_mass_mail
+# from django.core.mail import EmailMultiAlternatives
 # from django.db.models.signals import post_save
 # from django.dispatch import receiver
 
@@ -598,16 +596,67 @@ def send_newsletter_on_publish(sender, instance, created, **kwargs):
 # # ---------------------------------------------------------------------
 # # 8. SIGNAL — Send newsletter email when new content is published
 # #
-# # IMPORTANT: this handler only *schedules* the send after the DB
-# # transaction commits, and does the actual sending on a background
-# # thread. This keeps the admin's save/response fast regardless of how
-# # slow the SMTP backend is. It also only fires ONCE per piece, tracked
-# # via the newsletter_sent flag, so editing a published piece later
-# # never re-blasts subscribers.
+# # Sends a styled HTML email (with plain-text fallback) to each active
+# # subscriber individually, via EmailMultiAlternatives. Fires only once
+# # per piece thanks to the newsletter_sent flag, and runs on a
+# # background thread after the DB commit so publishing in the admin
+# # stays fast.
 # # ---------------------------------------------------------------------
-# def _do_send_newsletter(content_piece_id, title, subtitle, slug):
-#     from django.core.mail import send_mass_mail as _send_mass_mail
 
+# NEWSLETTER_HTML_TEMPLATE = """\
+# <!DOCTYPE html>
+# <html>
+#   <body style="margin:0; padding:0; background-color:#f4f1ec; font-family: Georgia, 'Times New Roman', serif;">
+#     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f1ec; padding:32px 0;">
+#       <tr>
+#         <td align="center">
+#           <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="background-color:#ffffff; border-radius:8px; overflow:hidden; box-shadow:0 2px 8px rgba(0,0,0,0.06);">
+
+#             <!-- Header -->
+#             <tr>
+#               <td style="background-color:#1a1a1a; padding:24px 32px; text-align:center;">
+#                 <span style="color:#f4f1ec; font-size:13px; letter-spacing:3px; text-transform:uppercase;">MUSINGS by Shreyansi</span>
+#               </td>
+#             </tr>
+
+#             {cover_image_block}
+
+#             <!-- Body -->
+#             <tr>
+#               <td style="padding:36px 40px;">
+#                 <p style="margin:0 0 8px 0; font-size:12px; letter-spacing:2px; text-transform:uppercase; color:#a08a6a;">New {content_type_label}</p>
+#                 <h1 style="margin:0 0 12px 0; font-size:28px; line-height:1.3; color:#1a1a1a;">{title}</h1>
+#                 {subtitle_block}
+#                 <p style="margin:24px 0 0 0; font-size:15px; line-height:1.7; color:#444444;">{excerpt}</p>
+
+#                 <table role="presentation" cellpadding="0" cellspacing="0" style="margin:32px 0 0 0;">
+#                   <tr>
+#                     <td style="background-color:#1a1a1a; border-radius:4px;">
+#                       <a href="{read_url}" style="display:inline-block; padding:14px 28px; color:#f4f1ec; text-decoration:none; font-size:14px; letter-spacing:1px; text-transform:uppercase;">Read the Piece</a>
+#                     </td>
+#                   </tr>
+#                 </table>
+#               </td>
+#             </tr>
+
+#             <!-- Footer -->
+#             <tr>
+#               <td style="padding:24px 40px; background-color:#f4f1ec; text-align:center;">
+#                 <p style="margin:0; font-size:12px; color:#999999;">MUSINGS by Shreyansi — An Independent Magazine</p>
+#                 <p style="margin:8px 0 0 0; font-size:11px; color:#bbbbbb;">You're receiving this because you subscribed at musingsby.shreyansi.com</p>
+#               </td>
+#             </tr>
+
+#           </table>
+#         </td>
+#       </tr>
+#     </table>
+#   </body>
+# </html>
+# """
+
+
+# def _do_send_newsletter(content_piece_id, title, subtitle, slug, content_type_label, body, cover_image_url):
 #     print(f"[NEWSLETTER] Background thread started for piece {content_piece_id}")
 #     try:
 #         subscribers = NewsletterSubscriber.objects.filter(is_active=True)
@@ -617,31 +666,56 @@ def send_newsletter_on_publish(sender, instance, created, **kwargs):
 #             print("[NEWSLETTER] No active subscribers, aborting send.")
 #             return
 
-#         subject = f"New: {title} — MUSINGS by Shreyansi"
 #         frontend_url = getattr(settings, "FRONTEND_URL", "https://musingsby.shreyansi.com")
+#         read_url = f"{frontend_url}/piece/{slug}"
+#         from_email = getattr(settings, "DEFAULT_FROM_EMAIL", "noreply@musingsby.shreyansi.com")
 
-#         message = f"""Hi there,
+#         excerpt = (body or "").strip()
+#         if len(excerpt) > 280:
+#             excerpt = excerpt[:280].rsplit(" ", 1)[0] + "…"
 
-# New content from MUSINGS by Shreyansi:
+#         subtitle_block = (
+#             f'<p style="margin:0; font-size:16px; color:#777777; font-style:italic;">{subtitle}</p>'
+#             if subtitle else ""
+#         )
+#         cover_image_block = (
+#             f'''<tr><td style="padding:0;"><img src="{cover_image_url}" alt="" width="600" style="display:block; width:100%; height:auto;"/></td></tr>'''
+#             if cover_image_url else ""
+#         )
+
+#         html_body = NEWSLETTER_HTML_TEMPLATE.format(
+#             title=title,
+#             subtitle_block=subtitle_block,
+#             content_type_label=content_type_label,
+#             excerpt=excerpt,
+#             read_url=read_url,
+#             cover_image_block=cover_image_block,
+#         )
+
+#         plain_body = f"""New {content_type_label} — MUSINGS by Shreyansi
 
 # {title}
 # {subtitle or ''}
 
-# Read more: {frontend_url}/piece/{slug}
+# {excerpt}
+
+# Read more: {read_url}
 
 # ---
 # MUSINGS by Shreyansi
 # An Independent Magazine
 # """
 
-#         from_email = getattr(settings, "DEFAULT_FROM_EMAIL", "noreply@musingsby.shreyansi.com")
-#         print(f"[NEWSLETTER] Sending from {from_email} to {emails} via {settings.EMAIL_HOST}")
+#         subject = f"New: {title} — MUSINGS by Shreyansi"
+#         sent_count = 0
 
-#         result = _send_mass_mail(
-#             [(subject, message, from_email, [email]) for email in emails],
-#             fail_silently=False,
-#         )
-#         print(f"[NEWSLETTER] send_mass_mail returned: {result}")
+#         for email in emails:
+#             msg = EmailMultiAlternatives(subject, plain_body, from_email, [email])
+#             msg.attach_alternative(html_body, "text/html")
+#             msg.send()
+#             sent_count += 1
+
+#         print(f"[NEWSLETTER] Sent {sent_count}/{len(emails)} email(s) successfully")
 
 #         ContentPiece.objects.filter(pk=content_piece_id).update(newsletter_sent=True)
 #         print(f"[NEWSLETTER] Marked piece {content_piece_id} as newsletter_sent=True")
@@ -662,7 +736,21 @@ def send_newsletter_on_publish(sender, instance, created, **kwargs):
 #         and not instance.newsletter_sent
 #     ):
 #         print(f"[NEWSLETTER] Conditions met, scheduling send for piece {instance.pk}")
-#         args = (instance.pk, instance.title, instance.subtitle, instance.slug)
+#         cover_image_url = instance.cover_image.url if instance.cover_image else None
+#         args = (
+#             instance.pk,
+#             instance.title,
+#             instance.subtitle,
+#             instance.slug,
+#             instance.get_content_type_display(),
+#             instance.body,
+#             cover_image_url,
+#         )
 #         transaction.on_commit(lambda: threading.Thread(target=_do_send_newsletter, args=args, daemon=True).start())
 #     else:
 #         print(f"[NEWSLETTER] Conditions NOT met, skipping send for piece {instance.pk}")
+
+
+
+
+
