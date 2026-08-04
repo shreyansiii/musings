@@ -265,7 +265,7 @@ NEWSLETTER_HTML_TEMPLATE = """\
             <tr>
               <td style="padding:24px 40px; background-color:#f4f1ec; text-align:center;">
                 <p style="margin:0; font-size:12px; color:#999999;">MUSINGS by Shreyansi — An Independent Magazine</p>
-                <p style="margin:8px 0 0 0; font-size:11px; color:#bbbbbb;">You're receiving this because you subscribed at musingsby.shreyansi.com</p>
+                <p style="margin:8px 0 0 0; font-size:11px; color:#bbbbbb;">You're receiving this because you subscribed at musingsbyshreyansi.vercel.app</p>
               </td>
             </tr>
 

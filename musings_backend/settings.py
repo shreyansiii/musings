@@ -173,7 +173,7 @@ DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 # }
 
 # DEFAULT_FROM_EMAIL = "onboarding@resend.dev"
-FRONTEND_URL = os.getenv('FRONTEND_URL', 'https://musingsby.shreyansi.com')
+FRONTEND_URL = os.getenv('FRONTEND_URL', 'https://musingsbyshreyansi.vercel.app')
 
 
 
