@@ -1,0 +1,14 @@
+name: Keep Render Awake
+
+on:
+  schedule:
+    # Runs every 10 minutes — safely under Render's 15-minute idle threshold
+    - cron: "*/10 * * * *"
+  workflow_dispatch: # lets you trigger it manually from the Actions tab too
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping backend to prevent spin-down
+        run: curl -sf https://musings-uiej.onrender.com/genres/ || echo "Ping failed (service may be cold-starting)"
