@@ -1,3 +1,4 @@
+import html
 import re
 
 from rest_framework import serializers
@@ -46,6 +47,11 @@ class ContentPieceListSerializer(serializers.ModelSerializer):
         # Strip HTML tags BEFORE truncating, so a slice never lands in the
         # middle of a tag and leaves a dangling "<a href=..." in the output.
         clean = re.sub(r"<[^>]*>", " ", body)
+        # Decode entities like &ldquo; &rdquo; &amp; &nbsp; (common when text
+        # is pasted in from Word/Google Docs) back into normal characters —
+        # do this AFTER stripping tags so nothing decodes into a stray "<" or
+        # ">" that could be mistaken for markup.
+        clean = html.unescape(clean)
         clean = re.sub(r"\s+", " ", clean).strip()
 
         max_len = 160
@@ -83,10 +89,6 @@ class NewsletterSubscriberSerializer(serializers.Serializer):
             subscriber.is_active = True
             subscriber.save()
         return subscriber
-
-
-
-
 
 
 
