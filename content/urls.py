@@ -7,6 +7,7 @@ from .views import (
     NewsletterSubscriberViewSet,
     ContactMessageView,
     health_check,
+    performance_check,
 )
 
 router = DefaultRouter()
@@ -17,6 +18,7 @@ router.register("newsletter", NewsletterSubscriberViewSet, basename="newsletter"
 urlpatterns = router.urls + [
     path("contact/", ContactMessageView.as_view(), name="contact-message"),
     path("health/", health_check, name="health-check"),
+    path("performance-check/", performance_check),
 ]
 
 

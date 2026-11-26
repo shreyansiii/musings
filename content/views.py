@@ -13,6 +13,10 @@ from .serializers import (
     NewsletterSubscriberSerializer,
 )
 from django.http import JsonResponse
+import time
+from django.db import connection
+from django.http import JsonResponse
+from django.db.models import Count
 
 
 class GenreViewSet(viewsets.ReadOnlyModelViewSet):
@@ -134,6 +138,35 @@ def health_check(request):
         "status": "healthy",
         "message": "Musings backend is running"
     })
+
+
+
+
+
+
+
+def performance_check(request):
+    start = time.perf_counter()
+
+    count = ContentPiece.objects.filter(status="published").count()
+    count_time = time.perf_counter() - start
+
+    start = time.perf_counter()
+
+    list(ContentPiece.objects.filter(
+        status="published"
+    ).select_related("author", "genre").order_by("-published_at")[:10])
+
+    query_time = time.perf_counter() - start
+
+    return JsonResponse({
+        "published_articles": count,
+        "count_query_seconds": round(count_time, 3),
+        "ten_articles_query_seconds": round(query_time, 3),
+    })
+
+
+
 
 
 
