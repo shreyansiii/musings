@@ -12,6 +12,7 @@ from .serializers import (
     ContentPieceDetailSerializer,
     NewsletterSubscriberSerializer,
 )
+from django.http import JsonResponse
 
 
 class GenreViewSet(viewsets.ReadOnlyModelViewSet):
@@ -103,6 +104,12 @@ class ContactMessageView(APIView):
 
 
 
+
+def health_check(request):
+    return JsonResponse({
+        "status": "healthy",
+        "message": "Musings backend is running"
+    })
 
 
 
