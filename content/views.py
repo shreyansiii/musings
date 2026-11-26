@@ -145,24 +145,40 @@ def health_check(request):
 
 
 
+
 def performance_check(request):
+    import time
+
+    # 1. Measure database fetching
     start = time.perf_counter()
 
-    count = ContentPiece.objects.filter(status="published").count()
-    count_time = time.perf_counter() - start
-
-    start = time.perf_counter()
-
-    list(ContentPiece.objects.filter(
+    queryset = ContentPiece.objects.filter(
         status="published"
-    ).select_related("author", "genre").order_by("-published_at")[:10])
+    ).select_related(
+        "author", "genre"
+    ).order_by("-published_at")
 
-    query_time = time.perf_counter() - start
+    articles = list(queryset)
+
+    fetch_time = time.perf_counter() - start
+
+    # 2. Measure serializer processing
+    start = time.perf_counter()
+
+    serializer = ContentPieceListSerializer(
+        articles,
+        many=True,
+        context={"request": request}
+    )
+
+    serialized_data = serializer.data
+
+    serialization_time = time.perf_counter() - start
 
     return JsonResponse({
-        "published_articles": count,
-        "count_query_seconds": round(count_time, 3),
-        "ten_articles_query_seconds": round(query_time, 3),
+        "articles": len(articles),
+        "database_fetch_seconds": round(fetch_time, 3),
+        "serialization_seconds": round(serialization_time, 3),
     })
 
 
