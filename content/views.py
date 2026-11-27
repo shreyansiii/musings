@@ -14,9 +14,8 @@ from .serializers import (
 )
 from django.http import JsonResponse
 import time
-from django.db import connection
 from django.http import JsonResponse
-from django.db.models import Count
+
 
 
 class GenreViewSet(viewsets.ReadOnlyModelViewSet):
@@ -34,20 +33,24 @@ class ContentPieceViewSet(viewsets.ReadOnlyModelViewSet):
             return ContentPieceDetailSerializer
         return ContentPieceListSerializer
 
-    # def get_queryset(self):
-    #     queryset = super().get_queryset()
+    def get_queryset(self):
+        queryset = super().get_queryset().select_related(
+            "author",
+            "genre"
+        )
 
-    #     genre = self.request.query_params.get("genre")
-    #     if genre:
-    #         queryset = queryset.filter(genre__slug=genre)
+        genre = self.request.query_params.get("genre")
+        if genre:
+            queryset = queryset.filter(genre__slug=genre)
 
-    #     search = self.request.query_params.get("search")
-    #     if search:
-    #         queryset = queryset.filter(
-    #             Q(title__icontains=search) | Q(body__icontains=search)
-    #         )
+        search = self.request.query_params.get("search")
+        if search:
+            queryset = queryset.filter(
+                Q(title__icontains=search) |
+                Q(body__icontains=search)
+            )
 
-    #     return queryset.order_by("-published_at")
+        return queryset.order_by("-published_at")
 
 
 # def get_queryset(self):
